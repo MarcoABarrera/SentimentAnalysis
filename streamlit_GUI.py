@@ -11,7 +11,9 @@ vectorizer = joblib.load("vectorizer.joblib")
 # Loading the preprocessed data
 @st.cache_data
 def load_data():
-    df = pd.read_csv("cleaned_comments.csv", nrows=50000)
+    url = "https://redditcommentscleaned.blob.core.windows.net/data/cleaned_comments.csv"
+    #df = pd.read_csv("cleaned_comments.csv", nrows=50000)
+    df = pd.read_csv(url)
     df['timestamp'] = pd.to_datetime(df['created_utc'], unit='s')
     return df
 
