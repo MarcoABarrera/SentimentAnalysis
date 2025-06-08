@@ -7,7 +7,10 @@ model = joblib.load("logistic_model.pkl")
 vectorizer = joblib.load("vectorizer.pkl")
 
 # Load the dataset (small portion or already preloaded)
-df = pd.read_csv("cleaned_comments.csv", nrows=100_000)
+#df = pd.read_csv("cleaned_comments.csv", nrows=100_000)
+url = "https://redditcommentscleaned.blob.core.windows.net/data/cleaned_comments.csv"
+    #df = pd.read_csv("cleaned_comments.csv", nrows=50000)
+df = pd.read_csv(url)
 df['label'] = df['score'].apply(lambda x: 1 if x > 2 else 0)
 
 # Start keyword query loop
