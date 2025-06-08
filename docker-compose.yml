@@ -1,0 +1,66 @@
+#this file is intended to create all 3 containers: kafka, zookeeper and the graphical user interface that kafka provides
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on: 
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,DOCKER://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,DOCKER://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    depends_on:
+      - kafka
+      - zookeeper
+
+  jobmanager:
+    image: my-flink-custom:1.17.2
+    container_name: jobmanager
+    ports:
+      - "8081:8081"  # Flink UI
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - NLTK_DATA=/opt/flink/nltk_data
+    volumes:
+      - "C:/Users/Mabs_/Desktop/Semester 2/05_BigData/flink/pyflink_kafka_job.py:/opt/flink/usrlib/pyflink_kafka_job.py"
+      - ./nltk_data:/opt/flink/nltk_data
+    command: jobmanager
+
+  taskmanager:
+    image: my-flink-custom:1.17.2
+    container_name: taskmanager
+    depends_on:
+      - jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - NLTK_DATA=/opt/flink/nltk_data
+    volumes:
+      - "C:/Users/Mabs_/Desktop/Semester 2/05_BigData/flink/pyflink_kafka_job.py:/opt/flink/usrlib/pyflink_kafka_job.py"
+      - ./nltk_data:/opt/flink/nltk_data
+    command: taskmanager    
