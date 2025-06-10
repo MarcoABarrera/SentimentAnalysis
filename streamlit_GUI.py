@@ -11,7 +11,7 @@ vectorizer = joblib.load("vectorizer.joblib")
 # Loading the preprocessed data
 @st.cache_data
 def load_data(keyword):
-    # Only load data relevant to the current keyword
+    url = "https://redditcommentscleaned.blob.core.windows.net/data/cleaned_comments.csv"
     chunk_iter = pd.read_csv(url, chunksize=100000)
     relevant_chunks = []
     for chunk in chunk_iter:
