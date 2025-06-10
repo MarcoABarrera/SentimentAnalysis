@@ -24,7 +24,7 @@ def load_data(keyword):
     df['timestamp'] = pd.to_datetime(df['created_utc'], unit='s')
     return df
 
-df = load_data()
+#df = load_data()
 
 # --- Streamlit UI ---
 st.title("Sentiment Analysis Dashboard")
@@ -36,20 +36,22 @@ keyword2 = col2.text_input("Keyword 2", value="human")
 
 #Creating the Analyze button to run the model
 if st.button("Analyze"):
-    def analyze_keyword(keyword):
-        subset = df[df['cleaned_text'].str.contains(keyword, case=False, na=False)]
-        if subset.empty:
+    # Load data for both keywords
+    df1 = load_data(keyword1)
+    df2 = load_data(keyword2)
+
+    def analyze_keyword(df, keyword):
+        if df is None:
             return None, None, None
 
-        X = vectorizer.transform(subset['cleaned_text'])
+        X = vectorizer.transform(df['cleaned_text'])
         preds = model.predict(X)
-        subset['sentiment'] = preds
+        df['sentiment'] = preds
 
-        sentiment_counts = subset['sentiment'].value_counts().sort_index()
+        sentiment_counts = df['sentiment'].value_counts().sort_index()
         sentiment_counts = sentiment_counts.reindex([0, 1], fill_value=0)
-
-        sentiment_over_time = subset.groupby(subset['timestamp'].dt.date)['sentiment'].mean()
-        return sentiment_counts, sentiment_over_time, len(subset)
+        sentiment_over_time = df.groupby(df['timestamp'].dt.date)['sentiment'].mean()
+        return sentiment_counts, sentiment_over_time, len(df)
 
     st.subheader(f"Sentiment for: {keyword1}")
     counts1, timeline1, total1 = analyze_keyword(keyword1)
