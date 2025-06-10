@@ -10,12 +10,17 @@ vectorizer = joblib.load("vectorizer.joblib")
 
 # Loading the preprocessed data
 @st.cache_data
-def load_data():
-    url = "https://redditcommentscleaned.blob.core.windows.net/data/cleaned_comments.csv"
-    #df = pd.read_csv("cleaned_comments.csv", nrows=50000)
+def load_data(keyword):
+    # Only load data relevant to the current keyword
     chunk_iter = pd.read_csv(url, chunksize=100000)
-    #df = pd.read_csv(url)
-    df = pd.concat(chunk_iter, ignore_index=True)
+    relevant_chunks = []
+    for chunk in chunk_iter:
+        mask = chunk['cleaned_text'].str.contains(keyword, case=False, na=False)
+        if mask.any():
+            relevant_chunks.append(chunk[mask])
+    if not relevant_chunks:
+        return None
+    df = pd.concat(relevant_chunks)
     df['timestamp'] = pd.to_datetime(df['created_utc'], unit='s')
     return df
 
