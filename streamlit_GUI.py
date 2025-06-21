@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import joblib
 import plotly.express as px
+from azure.storage.blob import BlobServiceClient
+import io
 
 # Load model and vectorizer
 model = joblib.load("sentiment_model.joblib")
@@ -9,13 +11,21 @@ vectorizer = joblib.load("vectorizer.joblib")
 
 # Load data from Azure Blob in chunks
 @st.cache_data(show_spinner="Loading data from Azure Blob...")
-def load_matching_data_from_blob(keyword1, keyword2, target_rows=500_000, chunk_size=100_000):
-    url = "https://redditcommentscleaned.blob.core.windows.net/data/cleaned_comments.csv"
+def load_matching_data_from_blob(keyword1, keyword2, target_rows=10000, chunk_size=5000):
+    conn_str = "BlobEndpoint=https://redditcommentscleaned.blob.core.windows.net/;QueueEndpoint=https://redditcommentscleaned.queue.core.windows.net/;FileEndpoint=https://redditcommentscleaned.file.core.windows.net/;TableEndpoint=https://redditcommentscleaned.table.core.windows.net/;SharedAccessSignature=sv=2024-11-04&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2025-06-22T05:52:59Z&st=2025-06-21T21:52:59Z&spr=https&sig=URFtdroKRU7QrHTTNVKoyt2zUpysYpp37QVkMGHBsBk%3D"
+    container_name = "data"
+    blob_name = "cleaned_comments.csv"
+    
+    blob_service_client = BlobServiceClient.from_connection_string(conn_str)
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+
+    stream = blob_client.download_blob()
+    
     matched_frames = []
     row_count = 0
 
-    chunk_iter = pd.read_csv(url, chunksize=chunk_size)
-    for chunk in chunk_iter:
+    # Feed the stream to pandas in chunks
+    for chunk in pd.read_csv(io.BytesIO(stream.readall()), chunksize=chunk_size):
         chunk['timestamp'] = pd.to_datetime(chunk['created_utc'], unit='s')
         mask = (chunk['cleaned_text'].str.contains(keyword1, case=False, na=False)) | \
                (chunk['cleaned_text'].str.contains(keyword2, case=False, na=False))
