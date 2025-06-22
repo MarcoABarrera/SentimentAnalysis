@@ -2,41 +2,36 @@ import streamlit as st
 import pandas as pd
 import joblib
 import plotly.express as px
-from azure.storage.blob import BlobServiceClient
-import io
+from azure.data.tables import TableServiceClient
 
 # Load model and vectorizer
 model = joblib.load("sentiment_model.joblib")
 vectorizer = joblib.load("vectorizer.joblib")
 
-# Load data from Azure Blob in chunks
-@st.cache_data(show_spinner="Loading data from Azure Blob...")
-def load_matching_data_from_blob(keyword1, keyword2, target_rows=10000, chunk_size=5000):
-    conn_str = "BlobEndpoint=https://redditcommentscleaned.blob.core.windows.net/;QueueEndpoint=https://redditcommentscleaned.queue.core.windows.net/;FileEndpoint=https://redditcommentscleaned.file.core.windows.net/;TableEndpoint=https://redditcommentscleaned.table.core.windows.net/;SharedAccessSignature=sv=2024-11-04&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2025-06-22T05:52:59Z&st=2025-06-21T21:52:59Z&spr=https&sig=URFtdroKRU7QrHTTNVKoyt2zUpysYpp37QVkMGHBsBk%3D"
-    container_name = "data"
-    blob_name = "cleaned_comments.csv"
-    
-    blob_service_client = BlobServiceClient.from_connection_string(conn_str)
-    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+# Azure Table connection
+connection_string = "DefaultEndpointsProtocol=https;AccountName=redditcommentscleaned;AccountKey=uM3a2jjQqIeUOZdseu2maAVRQ1pgP74Lb742exwn5hIM+22G1Rq74WGt+5qlPpatpekKGGaB4Loq+AStF/QKIQ==;EndpointSuffix=core.windows.net"
+table_name = "ProcessedComments"
 
-    stream = blob_client.download_blob()
-    
-    matched_frames = []
-    row_count = 0
+@st.cache_data(show_spinner="Loading data from Azure Table Storage...")
+def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
+    service_client = TableServiceClient.from_connection_string(conn_str=connection_string)
+    table_client = service_client.get_table_client(table_name=table_name)
 
-    # Feed the stream to pandas in chunks
-    for chunk in pd.read_csv(io.BytesIO(stream.readall()), chunksize=chunk_size):
-        chunk['timestamp'] = pd.to_datetime(chunk['created_utc'], unit='s')
-        mask = (chunk['cleaned_text'].str.contains(keyword1, case=False, na=False)) | \
-               (chunk['cleaned_text'].str.contains(keyword2, case=False, na=False))
-        matched = chunk[mask]
-        matched_frames.append(matched)
-        row_count += len(matched)
-        if row_count >= target_rows:
+    filter_expression = f"(substringof('{keyword1}', cleaned_text) or substringof('{keyword2}', cleaned_text))"
+    entities = table_client.query_entities(filter=filter_expression)
+
+    data = []
+    for entity in entities:
+        row = {
+            "cleaned_text": entity.get("cleaned_text"),
+            "timestamp": pd.to_datetime(entity.get("timestamp"))
+        }
+        data.append(row)
+        if len(data) >= max_rows:
             break
 
-    if matched_frames:
-        return pd.concat(matched_frames)
+    if data:
+        return pd.DataFrame(data)
     else:
         return pd.DataFrame()
 
@@ -64,7 +59,7 @@ def analyze_keyword(df, keyword):
 
 # Streamlit UI
 st.title("Sentiment Analysis Dashboard")
-st.write("Enter two keywords to analyze sentiment in Reddit comments from Azure Blob storage.")
+st.write("Enter two keywords to analyze sentiment in Reddit comments from Azure Table Storage.")
 
 col_input1, col_input2 = st.columns(2)
 keyword1 = col_input1.text_input("Keyword 1", value="ai")
@@ -72,7 +67,7 @@ keyword2 = col_input2.text_input("Keyword 2", value="human")
 
 if st.button("Analyze"):
     with st.spinner("Loading and filtering data..."):
-        df = load_matching_data_from_blob(keyword1, keyword2)
+        df = load_matching_data_from_table(keyword1, keyword2)
 
     if df.empty:
         st.warning("No matching comments found in dataset.")
@@ -116,4 +111,3 @@ if st.button("Analyze"):
                 st.plotly_chart(fig2, use_container_width=True)
             else:
                 st.warning(f"No matching comments for '{keyword2}'.")
-
