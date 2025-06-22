@@ -22,7 +22,7 @@ def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
     filter_expression = (
         f"(substringof('{keyword1}', cleaned_text) or substringof('{keyword2}', cleaned_text))"
     )
-    entities = table_client.query_entities(filter=filter_expression)
+    entities = table_client.query_entities(query_filter=filter_expression)
 
     data = []
     for entity in entities:
