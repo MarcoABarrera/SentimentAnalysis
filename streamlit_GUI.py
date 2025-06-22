@@ -2,26 +2,30 @@ import streamlit as st
 import pandas as pd
 import joblib
 import plotly.express as px
-from azure.data.tables import TableClient
+from azure.data.tables import TableServiceClient
 
 # Load model and vectorizer
 model = joblib.load("sentiment_model.joblib")
 vectorizer = joblib.load("vectorizer.joblib")
 
-# Azure Table SAS URL
+# Azure Table Storage info
+account_url = "https://redditcommentscleaned.table.core.windows.net"
 sas_token = (
     "sv=2024-11-04&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2025-08-31T02:07:56Z&"
     "st=2025-06-22T18:07:56Z&spr=https&sig=yxCLVw%2BcnGLtyOxhtlcAVE%2FQ6OX2iEq8U5MrFtpKXtM%3D"
 )
-table_url = f"https://redditcommentscleaned.table.core.windows.net/ProcessedComments?{sas_token}"
+table_name = "ProcessedComments"
 
 @st.cache_data(show_spinner="Loading data from Azure Table Storage...")
 def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
-    table_client = TableClient.from_table_url(table_url)
+    # Create service client and table client
+    service_client = TableServiceClient(account_url=account_url, credential=sas_token)
+    table_client = service_client.get_table_client(table_name=table_name)
 
     filter_expression = (
         f"(substringof('{keyword1}', cleaned_text) or substringof('{keyword2}', cleaned_text))"
     )
+
     entities = table_client.query_entities(query_filter=filter_expression)
 
     data = []
