@@ -19,7 +19,7 @@ table_name = "ProcessedComments"
 @st.cache_data(show_spinner="Loading data from Azure Table Storage...")
 def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
     # Create service client and table client
-    service_client = TableServiceClient(account_url=account_url, credential=sas_token)
+    service_client = TableServiceClient(endpoint=account_url, credential=sas_token)
     table_client = service_client.get_table_client(table_name=table_name)
 
     filter_expression = (
