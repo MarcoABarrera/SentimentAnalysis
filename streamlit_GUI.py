@@ -2,22 +2,26 @@ import streamlit as st
 import pandas as pd
 import joblib
 import plotly.express as px
-from azure.data.tables import TableServiceClient
+from azure.data.tables import TableClient
 
 # Load model and vectorizer
 model = joblib.load("sentiment_model.joblib")
 vectorizer = joblib.load("vectorizer.joblib")
 
-# Azure Table connection
-connection_string = "DefaultEndpointsProtocol=https;AccountName=redditcommentscleaned;AccountKey=uM3a2jjQqIeUOZdseu2maAVRQ1pgP74Lb742exwn5hIM+22G1Rq74WGt+5qlPpatpekKGGaB4Loq+AStF/QKIQ==;EndpointSuffix=core.windows.net"
-table_name = "ProcessedComments"
+# Azure Table SAS URL
+sas_token = (
+    "sv=2024-11-04&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2025-08-31T02:07:56Z&"
+    "st=2025-06-22T18:07:56Z&spr=https&sig=yxCLVw%2BcnGLtyOxhtlcAVE%2FQ6OX2iEq8U5MrFtpKXtM%3D"
+)
+table_url = f"https://redditcommentscleaned.table.core.windows.net/ProcessedComments?{sas_token}"
 
 @st.cache_data(show_spinner="Loading data from Azure Table Storage...")
 def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
-    service_client = TableServiceClient.from_connection_string(conn_str=connection_string)
-    table_client = service_client.get_table_client(table_name=table_name)
+    table_client = TableClient.from_table_url(table_url)
 
-    filter_expression = f"(substringof('{keyword1}', cleaned_text) or substringof('{keyword2}', cleaned_text))"
+    filter_expression = (
+        f"(substringof('{keyword1}', cleaned_text) or substringof('{keyword2}', cleaned_text))"
+    )
     entities = table_client.query_entities(filter=filter_expression)
 
     data = []
@@ -45,14 +49,27 @@ def analyze_keyword(df, keyword):
     preds = model.predict(X)
     subset['sentiment'] = preds
 
-    sentiment_counts = subset['sentiment'].value_counts().sort_index().reindex([0, 1], fill_value=0)
+    sentiment_counts = (
+        subset['sentiment']
+        .value_counts()
+        .sort_index()
+        .reindex([0, 1], fill_value=0)
+    )
 
-    daily_sentiment = subset.groupby(subset['timestamp'].dt.date)['sentiment'].mean().reset_index()
+    daily_sentiment = (
+        subset.groupby(subset['timestamp'].dt.date)['sentiment']
+        .mean()
+        .reset_index()
+    )
     daily_sentiment.columns = ['time', 'average_sentiment']
 
     if daily_sentiment['time'].nunique() == 1:
         subset['hour'] = subset['timestamp'].dt.floor('H')
-        daily_sentiment = subset.groupby('hour')['sentiment'].mean().reset_index()
+        daily_sentiment = (
+            subset.groupby('hour')['sentiment']
+            .mean()
+            .reset_index()
+        )
         daily_sentiment.columns = ['time', 'average_sentiment']
 
     return sentiment_counts, daily_sentiment, len(subset)
