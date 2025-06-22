@@ -3,6 +3,7 @@ import pandas as pd
 import joblib
 import plotly.express as px
 from azure.data.tables import TableServiceClient
+from azure.core.credentials import AzureSasCredential
 
 # Load model and vectorizer
 model = joblib.load("sentiment_model.joblib")
@@ -19,7 +20,8 @@ table_name = "ProcessedComments"
 @st.cache_data(show_spinner="Loading data from Azure Table Storage...")
 def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
     # Create service client and table client
-    service_client = TableServiceClient(endpoint=account_url, credential=sas_token)
+    credential = AzureSasCredential(sas_token)
+    service_client = TableServiceClient(endpoint=account_url, credential=credential)
     table_client = service_client.get_table_client(table_name=table_name)
 
     filter_expression = (
