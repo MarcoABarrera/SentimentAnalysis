@@ -23,27 +23,23 @@ def load_matching_data_from_table(keyword1, keyword2, max_rows=10000):
     credential = AzureSasCredential(sas_token)
     service_client = TableServiceClient(endpoint=account_url, credential=credential)
     table_client = service_client.get_table_client(table_name=table_name)
-
-    filter_expression = (
-        f"(substringof('{keyword1}', cleaned_text) or substringof('{keyword2}', cleaned_text))"
-    )
-
-    entities = table_client.query_entities(query_filter=filter_expression)
+  # Retrieve all entities (or as many as allowed by max_rows)
+    entities = table_client.list_entities()
 
     data = []
     for entity in entities:
-        row = {
-            "cleaned_text": entity.get("cleaned_text"),
-            "timestamp": pd.to_datetime(entity.get("timestamp"))
-        }
-        data.append(row)
+        text = entity.get("cleaned_text", "")
+        timestamp = entity.get("timestamp")
+        if (keyword1.lower() in text.lower()) or (keyword2.lower() in text.lower()):
+            row = {
+                "cleaned_text": text,
+                "timestamp": pd.to_datetime(timestamp)
+            }
+            data.append(row)
         if len(data) >= max_rows:
             break
 
-    if data:
-        return pd.DataFrame(data)
-    else:
-        return pd.DataFrame()
+    return pd.DataFrame(data) if data else pd.DataFrame()
 
 # Analysis function
 def analyze_keyword(df, keyword):
